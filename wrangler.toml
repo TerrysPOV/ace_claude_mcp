@@ -1,0 +1,21 @@
+# ACE MCP Server - Cloudflare Workers Configuration
+name = "ace-mcp"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "ace-playbook"
+database_id = "<YOUR-DATABASE-ID>"  # Run: wrangler d1 create ace-playbook
+
+# Optional: Environment variables
+# [vars]
+# LOG_LEVEL = "info"
+
+# Optional: Production environment
+# [env.production]
+# d1_databases = [
+#   { binding = "DB", database_name = "ace-playbook-prod", database_id = "<PROD-DB-ID>" }
+# ]
