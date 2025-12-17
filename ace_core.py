@@ -20,7 +20,7 @@ REFLECTIONS_DIR = ACE_DIR / "reflections"
 PROJECTS_FILE = ACE_DIR / "projects.json"
 
 # Thread lock for file operations
-_file_lock = threading.Lock()
+_file_lock = threading.RLock()   # Reentrant lock
 
 # Section prefixes for ID generation
 SECTION_PREFIXES = {
