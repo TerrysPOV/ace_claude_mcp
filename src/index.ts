@@ -11,6 +11,7 @@ import { z } from "zod";
 
 interface Env {
   DB: D1Database;
+  MCP_AGENT: DurableObjectNamespace<AceMcpAgent>;
 }
 
 // Section prefixes for ID generation
@@ -359,6 +360,16 @@ export class AceMcpAgent extends McpAgent<Env> {
   }
 }
 
+// Create the MCP route handler using McpAgent.mount()
+const mcpHandler = AceMcpAgent.mount("/sse", {
+  binding: "MCP_AGENT",
+  corsOptions: {
+    origin: "*",
+    methods: "GET, POST, OPTIONS",
+    headers: "Content-Type, Authorization, mcp-session-id",
+  },
+});
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -374,11 +385,12 @@ export default {
       });
     }
 
-    // MCP SSE endpoint
-    if (url.pathname === "/sse" || url.pathname === "/sse/message") {
-      const agent = new AceMcpAgent(env, ctx);
-      await agent.init();
-      return agent.fetch(request);
+    // MCP endpoints - route through the mount handler
+    if (url.pathname.startsWith("/sse")) {
+      const response = await mcpHandler.fetch(request, env as Record<string, DurableObjectNamespace>, ctx);
+      if (response) {
+        return response;
+      }
     }
 
     return new Response("Not Found", { status: 404 });
