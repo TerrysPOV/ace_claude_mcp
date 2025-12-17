@@ -360,16 +360,8 @@ export class AceMcpAgent extends McpAgent<Env> {
 }
 
 export default {
-  fetch(request: Request, env: Env, ctx: ExecutionContext) {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-
-    if (url.pathname === "/sse" || url.pathname === "/sse/message") {
-      return AceMcpAgent.serveSSE("/sse", request, env, ctx);
-    }
-
-    if (url.pathname === "/mcp") {
-      return AceMcpAgent.serve("/mcp", request, env, ctx);
-    }
 
     // Health check
     if (url.pathname === "/" || url.pathname === "/health") {
@@ -380,6 +372,13 @@ export default {
       }), {
         headers: { "Content-Type": "application/json" }
       });
+    }
+
+    // MCP SSE endpoint
+    if (url.pathname === "/sse" || url.pathname === "/sse/message") {
+      const agent = new AceMcpAgent(env, ctx);
+      await agent.init();
+      return agent.fetch(request);
     }
 
     return new Response("Not Found", { status: 404 });

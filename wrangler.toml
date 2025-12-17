@@ -8,7 +8,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "ace-playbook"
-database_id = "<YOUR-DATABASE-ID>"  # Run: wrangler d1 create ace-playbook
+database_id = "40140028-929a-4621-bc43-d1f69c2ca041"  # Run: wrangler d1 create ace-playbook
 
 # Optional: Environment variables
 # [vars]
