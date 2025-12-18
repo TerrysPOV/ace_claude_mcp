@@ -8,14 +8,14 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "ace-playbook"
-database_id = "40140028-929a-4621-bc43-d1f69c2ca041"  # Run: wrangler d1 create ace-playbook
+database_id = "40140028-929a-4621-bc43-d1f69c2ca041"
 
-# Optional: Environment variables
-# [vars]
-# LOG_LEVEL = "info"
+# Durable Objects configuration for MCP Agent
+[durable_objects]
+bindings = [
+  { name = "MCP_AGENT", class_name = "AceMcpAgent" }
+]
 
-# Optional: Production environment
-# [env.production]
-# d1_databases = [
-#   { binding = "DB", database_name = "ace-playbook-prod", database_id = "<PROD-DB-ID>" }
-# ]
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AceMcpAgent"]
