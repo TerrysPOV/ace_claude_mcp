@@ -387,10 +387,7 @@ export default {
 
     // MCP endpoints - route through the mount handler
     if (url.pathname.startsWith("/sse")) {
-      const response = await mcpHandler.fetch(request, env as Record<string, DurableObjectNamespace>, ctx);
-      if (response) {
-        return response;
-      }
+      return mcpHandler.fetch(request, env, ctx);
     }
 
     return new Response("Not Found", { status: 404 });

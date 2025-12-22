@@ -1,0 +1,354 @@
+#!/usr/bin/env python3
+"""
+claude-ace: ACE-enforced Claude Code wrapper (Cloudflare MCP version)
+
+Enforces ACE framework usage by injecting strict contracts into Claude Code sessions.
+Connects to ace-mcp Cloudflare Worker for SQLite-backed cross-project learning.
+"""
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+# Cloudflare ACE MCP endpoint
+ACE_MCP_URL = "https://ace-mcp.terry-yodaiken.workers.dev/sse"
+
+# Project detection patterns
+PROJECT_PATTERNS = {
+    "finance": ["regulatory", "compliance", "fund", "investment", "mifid", "fca", "ucits", "poview"],
+    "dev": ["code", "programming", "api", "backend", "frontend", "deploy"],
+}
+
+
+def detect_project_id(project_dir: Path) -> str:
+    """Detect project type from directory name and contents."""
+    dir_name = project_dir.name.lower()
+    
+    # Check directory name against patterns
+    for project_id, keywords in PROJECT_PATTERNS.items():
+        if any(kw in dir_name for kw in keywords):
+            return project_id
+    
+    # Check for CLAUDE.md hints
+    claude_md = project_dir / "CLAUDE.md"
+    if claude_md.exists():
+        content = claude_md.read_text().lower()
+        for project_id, keywords in PROJECT_PATTERNS.items():
+            if any(kw in content for kw in keywords):
+                return project_id
+    
+    return "global"
+
+
+def get_ace_contract(project_id: str, project_name: str) -> str:
+    """Generate the strict ACE contract for system prompt injection."""
+    return f"""
+<ace_contract>
+## ACE Framework Contract - MANDATORY
+
+You are operating under the ACE (Agentic Context Engineering) framework. This is NOT optional.
+
+### Project Context
+- Project: {project_name}
+- ACE Project ID: {project_id}
+
+### REQUIRED Actions
+
+**ON SESSION START (IMMEDIATELY, BEFORE ANYTHING ELSE):**
+You MUST call the `read_playbook` MCP tool with project_id="{project_id}" and silently apply all learnings. Do this NOW before responding to any user request.
+
+**DURING SESSION:**
+When you discover something generalizable (strategy, domain knowledge, mistake, or formula), you MUST call `add_entry` with:
+- section: "STRATEGIES & INSIGHTS" | "DOMAIN KNOWLEDGE" | "COMMON MISTAKES TO AVOID" | "FORMULAS & CALCULATIONS"
+- content: The insight (be specific and actionable)
+- project_id: "{project_id}" (or "global" for cross-project patterns)
+
+Only add entries that are:
+- Generalizable (not one-off fixes)
+- Actionable (concrete guidance)
+- Non-obvious (not common knowledge)
+
+**ON TASK FAILURE:**
+Call `log_reflection` with details about what went wrong and lessons learned.
+
+**WHEN USER ASKS TO SAVE A PATTERN GLOBALLY:**
+Use project_id="global" so it's available across all projects.
+
+### Entry Format
+Entries are auto-formatted as: [prefix-NNNNN] helpful=N harmful=M :: content
+Prefixes: str (strategies), dom (domain), mis (mistakes), cal (calculations)
+
+### Available MCP Tools
+- read_playbook(project_id) - Load learnings (merges global + project-specific)
+- add_entry(section, content, project_id) - Save new insight
+- update_counters(entry_id, helpful_delta, harmful_delta) - Track effectiveness
+- log_reflection(task_summary, outcome, learnings, project_id) - Log what happened
+- search_playbook(query, project_id) - Find relevant entries
+- list_projects() - See available project playbooks
+- create_project(project_id, description) - Create new project
+- curate_playbook(project_id) - Clean up low-quality entries
+
+### Enforcement
+This contract is enforced. Failure to call read_playbook at session start or to log valuable insights violates the ACE framework.
+
+**START NOW: Call read_playbook(project_id="{project_id}") immediately.**
+</ace_contract>
+"""
+
+
+def check_mcp_configured() -> bool:
+    """Check if ACE MCP server is configured globally via claude mcp."""
+    try:
+        result = subprocess.run(
+            ["claude", "mcp", "list"],
+            capture_output=True,
+            text=True
+        )
+        return "ace" in result.stdout.lower()
+    except Exception:
+        return False
+
+
+def get_shell_profile() -> Path:
+    """Detect the user's shell profile file."""
+    shell = os.environ.get("SHELL", "/bin/bash")
+    home = Path.home()
+    
+    if "zsh" in shell:
+        return home / ".zshrc"
+    elif "fish" in shell:
+        return home / ".config/fish/config.fish"
+    else:
+        return home / ".bashrc"
+
+
+def setup_api_key() -> bool:
+    """Check and setup ANTHROPIC_API_KEY if not present."""
+    existing_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if existing_key:
+        print(f"✓ ANTHROPIC_API_KEY already set")
+        return True
+    
+    # Check if it's in shell profile but not exported in current session
+    profile = get_shell_profile()
+    if profile.exists():
+        import re
+        content = profile.read_text()
+        # Look for actual export with a non-empty value (not commented)
+        match = re.search(r'^export\s+ANTHROPIC_API_KEY\s*=\s*["\']?(\S+)["\']?', content, re.MULTILINE)
+        if match and match.group(1):
+            print(f"✓ ANTHROPIC_API_KEY found in {profile.name}")
+            print(f"  Run: source {profile}")
+            return True
+    
+    print(f"\n[ACE] ANTHROPIC_API_KEY not found")
+    print(f"  Get your key from: https://console.anthropic.com/settings/keys\n")
+    
+    api_key = input("Enter your Anthropic API key: ").strip()
+    
+    if not api_key:
+        print("✗ No API key provided")
+        return False
+    
+    if not api_key.startswith("sk-ant-"):
+        print("⚠ Warning: Key doesn't look like an Anthropic key (should start with sk-ant-)")
+        confirm = input("Continue anyway? [y/N]: ").strip().lower()
+        if confirm != "y":
+            return False
+    
+    # Save to shell profile
+    profile = get_shell_profile()
+    export_line = f'\nexport ANTHROPIC_API_KEY="{api_key}"\n'
+    
+    print(f"\nSave to {profile.name}? [Y/n]: ", end="")
+    save = input().strip().lower()
+    
+    if save != "n":
+        with open(profile, "a") as f:
+            f.write(export_line)
+        print(f"✓ API key saved to {profile.name}")
+        print(f"  Run: source {profile}")
+        
+        # Also set for current session
+        os.environ["ANTHROPIC_API_KEY"] = api_key
+    else:
+        print(f"\nAdd this to your shell profile manually:")
+        print(f'  export ANTHROPIC_API_KEY="{api_key}"')
+    
+    return True
+
+
+def setup_mcp():
+    """Setup ACE MCP server globally via claude mcp add."""
+    print(f"[ACE] ACE Setup")
+    print(f"=" * 40)
+    
+    # Step 1: API Key
+    if not setup_api_key():
+        return False
+    
+    print()
+    
+    # Step 2: MCP Server
+    print(f"[ACE] Configuring MCP server...")
+    print(f"[ACE] Endpoint: {ACE_MCP_URL}")
+    
+    # Remove existing if present
+    subprocess.run(
+        ["claude", "mcp", "remove", "ace"],
+        capture_output=True
+    )
+    
+    # Add SSE transport
+    result = subprocess.run(
+        ["claude", "mcp", "add", "--transport", "sse", "ace", ACE_MCP_URL],
+        capture_output=True,
+        text=True
+    )
+    
+    if result.returncode == 0:
+        print(f"✓ ACE MCP server configured")
+        print(f"  Transport: SSE")
+        print(f"  URL: {ACE_MCP_URL}")
+        print()
+        print(f"[ACE] Setup complete! Run: claude-ace")
+        return True
+    else:
+        print(f"✗ Failed to configure MCP server")
+        print(f"  Error: {result.stderr}")
+        return False
+
+
+def show_status():
+    """Show ACE configuration status."""
+    configured = check_mcp_configured()
+    
+    print("ACE MCP Status")
+    print("=" * 40)
+    print(f"Endpoint: {ACE_MCP_URL}")
+    print(f"Configured: {'✓' if configured else '✗'}")
+    
+    if configured:
+        # Show current servers
+        result = subprocess.run(
+            ["claude", "mcp", "list"],
+            capture_output=True,
+            text=True
+        )
+        print(f"\nMCP Servers:")
+        print(result.stdout)
+    else:
+        print(f"\nRun: claude-ace setup")
+    
+    return 0
+
+
+def run_session(args, project_dir: Path):
+    """Run Claude Code session with ACE contract injected."""
+    
+    # Detect or use specified project ID
+    project_id = args.project_id or detect_project_id(project_dir)
+    project_name = project_dir.name
+    
+    # Generate contract
+    ace_contract = get_ace_contract(project_id, project_name)
+    
+    # Build command
+    cmd = ["claude"]
+    cmd.extend(["--append-system-prompt", ace_contract])
+    
+    if args.prompt:
+        cmd.extend(["-p", args.prompt])
+        if args.output_format:
+            cmd.extend(["--output-format", args.output_format])
+    
+    if args.resume:
+        cmd.append("--resume")
+    elif args.continue_session:
+        cmd.append("--continue")
+    
+    if args.model:
+        cmd.extend(["--model", args.model])
+    
+    if args.dangerously_skip_permissions:
+        cmd.append("--dangerously-skip-permissions")
+    
+    # Status
+    print(f"[ACE] Project: {project_name}")
+    print(f"[ACE] Project ID: {project_id}")
+    print(f"[ACE] Endpoint: {ACE_MCP_URL}")
+    print(f"[ACE] Contract injected - Claude MUST call read_playbook first")
+    print(f"[ACE] Starting session...\n")
+    
+    # Run
+    result = subprocess.run(cmd, cwd=project_dir)
+    
+    return result.returncode
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="ACE-enforced Claude Code wrapper (Cloudflare MCP version)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  claude-ace                              # Start interactive session
+  claude-ace -p "fix the bug"             # One-shot prompt
+  claude-ace --resume                     # Resume last session  
+  claude-ace --project-id finance         # Force specific project ID
+  claude-ace setup                        # Configure MCP server
+  claude-ace status                       # Check configuration
+        """
+    )
+    
+    parser.add_argument("command", nargs="?", default="run",
+                        choices=["run", "setup", "status"],
+                        help="Command (default: run)")
+    
+    # Prompt mode
+    parser.add_argument("-p", "--prompt", help="One-shot prompt")
+    parser.add_argument("--output-format", choices=["json", "stream-json"])
+    
+    # Session management  
+    parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--continue", dest="continue_session", action="store_true")
+    
+    # Model
+    parser.add_argument("--model", help="Model to use")
+    
+    # ACE options
+    parser.add_argument("--project-id", help="Force specific ACE project ID")
+    parser.add_argument("-C", "--project", type=Path,
+                        help="Project directory")
+    
+    # Permissions
+    parser.add_argument("--dangerously-skip-permissions", action="store_true")
+    
+    args = parser.parse_args()
+    
+    project_dir = (args.project or Path.cwd()).resolve()
+    
+    if args.command == "setup":
+        success = setup_mcp()
+        return 0 if success else 1
+    
+    if args.command == "status":
+        return show_status()
+    
+    # Check MCP is configured
+    if not check_mcp_configured():
+        print(f"[ACE] MCP server not configured!")
+        print(f"[ACE] Run: claude-ace setup")
+        return 1
+    
+    # Run session
+    return run_session(args, project_dir)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
