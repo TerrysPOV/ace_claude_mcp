@@ -24,7 +24,6 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-
 # Configuration - matches ace_core.py
 ACE_DIR = Path.home() / ".ace"
 PLAYBOOKS_DIR = ACE_DIR / "playbooks"
@@ -114,7 +113,7 @@ def migrate_reflections(reflections_path: Path, project_id: str) -> list[str]:
         return []
 
     statements = []
-    with open(reflections_path, "r", encoding="utf-8") as f:
+    with open(reflections_path, encoding="utf-8") as f:
         for line in f:
             try:
                 reflection = json.loads(line.strip())

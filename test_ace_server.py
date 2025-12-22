@@ -1,7 +1,6 @@
 """Tests for ACE Core Logic with multi-project support."""
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -168,7 +167,7 @@ class TestLogReflection:
         assert "2 learning(s)" in result
 
         refl_path = isolated_test_dir["reflections"] / "global.jsonl"
-        with open(refl_path, "r") as f:
+        with open(refl_path) as f:
             data = json.loads(f.readline())
             assert data["task_summary"] == "Test task"
             assert data["outcome"] == "success"
@@ -180,7 +179,7 @@ class TestLogReflection:
 
         refl_path = isolated_test_dir["reflections"] / "finance.jsonl"
         assert refl_path.exists()
-        with open(refl_path, "r") as f:
+        with open(refl_path) as f:
             data = json.loads(f.readline())
             assert data["task_summary"] == "Finance task"
 

@@ -9,11 +9,11 @@ Usage:
     python curate.py <playbook_path> [--threshold 3] [--dry-run]
 """
 
-import re
 import argparse
-from pathlib import Path
-from difflib import SequenceMatcher
+import re
 from collections import defaultdict
+from difflib import SequenceMatcher
+from pathlib import Path
 
 # Entry pattern: [id-00001] helpful=N harmful=M :: content
 ENTRY_PATTERN = re.compile(
@@ -67,7 +67,7 @@ def find_duplicates(entries: list) -> list[set]:
             continue
             
         group = {entry_a['id']}
-        for j, entry_b in enumerate(entries[i+1:], start=i+1):
+        for entry_b in entries[i+1:]:
             if entry_b['id'] in processed:
                 continue
             if similarity(entry_a['content'], entry_b['content']) >= SIMILARITY_THRESHOLD:
@@ -227,7 +227,7 @@ def main():
     content = args.playbook.read_text()
     curated, stats = curate_playbook(content, args.threshold)
     
-    print(f"Curation complete:")
+    print("Curation complete:")
     print(f"  Sections processed: {stats['sections_processed']}")
     print(f"  Entries removed (harmful): {stats['total_removed_harmful']}")
     print(f"  Entries merged (duplicates): {stats['total_merged_duplicates']}")

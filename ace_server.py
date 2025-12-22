@@ -6,7 +6,7 @@ a structured text file that improves LLM context through reflection and curation
 Supports multi-project playbooks with global + project-specific entries.
 """
 
-from typing import Optional
+
 from fastmcp import FastMCP
 
 import ace_core
@@ -137,7 +137,7 @@ def log_reflection(
 
 @mcp.tool()
 def curate_playbook(
-    project_id: Optional[str] = None,
+    project_id: str | None = None,
     harmful_threshold: int = 3
 ) -> str:
     """
@@ -190,7 +190,7 @@ def list_projects() -> str:
 
 
 @mcp.tool()
-def create_project(project_id: str, description: Optional[str] = None) -> str:
+def create_project(project_id: str, description: str | None = None) -> str:
     """
     Create a new project for organizing domain-specific playbook entries.
 

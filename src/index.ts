@@ -5,8 +5,8 @@
  * Supports multi-project playbooks with global + project-specific entries.
  */
 
-import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpAgent } from "agents/mcp";
 import { z } from "zod";
 
 interface Env {
@@ -26,19 +26,29 @@ const VALID_SECTIONS = Object.keys(SECTION_PREFIXES);
 
 // Helper: Generate next ID for a section
 async function getNextId(db: D1Database, prefix: string): Promise<string> {
-  const result = await db.prepare(
-    `SELECT id FROM entries WHERE id LIKE ? ORDER BY id DESC LIMIT 1`
-  ).bind(`${prefix}-%`).first<{ id: string }>();
+  const result = await db
+    .prepare("SELECT id FROM entries WHERE id LIKE ? ORDER BY id DESC LIMIT 1")
+    .bind(`${prefix}-%`)
+    .first<{ id: string }>();
 
   if (result) {
-    const num = parseInt(result.id.split("-")[1], 10);
+    const num = Number.parseInt(result.id.split("-")[1], 10);
     return `${prefix}-${String(num + 1).padStart(5, "0")}`;
   }
   return `${prefix}-00001`;
 }
 
 // Helper: Format entries as markdown playbook
-function formatPlaybook(entries: Array<{ id: string; section: string; content: string; helpful: number; harmful: number; project_id: string }>): string {
+function formatPlaybook(
+  entries: Array<{
+    id: string;
+    section: string;
+    content: string;
+    helpful: number;
+    harmful: number;
+    project_id: string;
+  }>
+): string {
   const sections: Record<string, string[]> = {};
 
   for (const entry of entries) {
@@ -102,7 +112,10 @@ export class AceMcpAgent extends McpAgent<Env> {
       "read_playbook",
       "Return the full playbook content, merging global entries with project-specific entries",
       {
-        project_id: z.string().optional().describe("Project ID to read (default: 'global'). Merges global + project entries."),
+        project_id: z
+          .string()
+          .optional()
+          .describe("Project ID to read (default: 'global'). Merges global + project entries."),
       },
       async ({ project_id = "global" }) => {
         const entries = await this.env.DB.prepare(`
@@ -110,7 +123,16 @@ export class AceMcpAgent extends McpAgent<Env> {
           FROM entries
           WHERE project_id = 'global' OR project_id = ?
           ORDER BY section, project_id = 'global' DESC, id
-        `).bind(project_id).all<{ id: string; project_id: string; section: string; content: string; helpful: number; harmful: number }>();
+        `)
+          .bind(project_id)
+          .all<{
+            id: string;
+            project_id: string;
+            section: string;
+            content: string;
+            helpful: number;
+            harmful: number;
+          }>();
 
         return { content: [{ type: "text", text: formatPlaybook(entries.results || []) }] };
       }
@@ -122,7 +144,10 @@ export class AceMcpAgent extends McpAgent<Env> {
       "Get all entries from a specific section of the playbook",
       {
         section: z.enum(VALID_SECTIONS as [string, ...string[]]).describe("Section name"),
-        project_id: z.string().optional().describe("Project ID (default: includes global + this project)"),
+        project_id: z
+          .string()
+          .optional()
+          .describe("Project ID (default: includes global + this project)"),
       },
       async ({ section, project_id = "global" }) => {
         const entries = await this.env.DB.prepare(`
@@ -130,10 +155,21 @@ export class AceMcpAgent extends McpAgent<Env> {
           FROM entries
           WHERE section = ? AND (project_id = 'global' OR project_id = ?)
           ORDER BY project_id = 'global' DESC, id
-        `).bind(section, project_id).all<{ id: string; project_id: string; section: string; content: string; helpful: number; harmful: number }>();
+        `)
+          .bind(section, project_id)
+          .all<{
+            id: string;
+            project_id: string;
+            section: string;
+            content: string;
+            helpful: number;
+            harmful: number;
+          }>();
 
         const formatted = formatPlaybook(entries.results || []);
-        return { content: [{ type: "text", text: formatted || `No entries in section '${section}'` }] };
+        return {
+          content: [{ type: "text", text: formatted || `No entries in section '${section}'` }],
+        };
       }
     );
 
@@ -142,9 +178,14 @@ export class AceMcpAgent extends McpAgent<Env> {
       "add_entry",
       "Add a new entry to the playbook with auto-generated ID",
       {
-        section: z.enum(VALID_SECTIONS as [string, ...string[]]).describe("Section to add entry to"),
+        section: z
+          .enum(VALID_SECTIONS as [string, ...string[]])
+          .describe("Section to add entry to"),
         content: z.string().describe("The insight, formula, or knowledge to add"),
-        project_id: z.string().optional().describe("Project ID (default: 'global' for universal patterns)"),
+        project_id: z
+          .string()
+          .optional()
+          .describe("Project ID (default: 'global' for universal patterns)"),
       },
       async ({ section, content, project_id = "global" }) => {
         const prefix = SECTION_PREFIXES[section];
@@ -153,9 +194,18 @@ export class AceMcpAgent extends McpAgent<Env> {
         await this.env.DB.prepare(`
           INSERT INTO entries (id, project_id, section, content, helpful, harmful)
           VALUES (?, ?, ?, ?, 0, 0)
-        `).bind(newId, project_id, section, content.trim()).run();
+        `)
+          .bind(newId, project_id, section, content.trim())
+          .run();
 
-        return { content: [{ type: "text", text: `Added entry [${newId}] to '${section}' (project: ${project_id})` }] };
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Added entry [${newId}] to '${section}' (project: ${project_id})`,
+            },
+          ],
+        };
       }
     );
 
@@ -169,9 +219,9 @@ export class AceMcpAgent extends McpAgent<Env> {
         harmful_delta: z.number().describe("Amount to add to harmful counter"),
       },
       async ({ entry_id, helpful_delta, harmful_delta }) => {
-        const entry = await this.env.DB.prepare(
-          `SELECT helpful, harmful FROM entries WHERE id = ?`
-        ).bind(entry_id).first<{ helpful: number; harmful: number }>();
+        const entry = await this.env.DB.prepare("SELECT helpful, harmful FROM entries WHERE id = ?")
+          .bind(entry_id)
+          .first<{ helpful: number; harmful: number }>();
 
         if (!entry) {
           return { content: [{ type: "text", text: `Entry '${entry_id}' not found.` }] };
@@ -182,9 +232,18 @@ export class AceMcpAgent extends McpAgent<Env> {
 
         await this.env.DB.prepare(`
           UPDATE entries SET helpful = ?, harmful = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-        `).bind(newHelpful, newHarmful, entry_id).run();
+        `)
+          .bind(newHelpful, newHarmful, entry_id)
+          .run();
 
-        return { content: [{ type: "text", text: `Updated [${entry_id}]: helpful=${entry.helpful}->${newHelpful}, harmful=${entry.harmful}->${newHarmful}` }] };
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Updated [${entry_id}]: helpful=${entry.helpful}->${newHelpful}, harmful=${entry.harmful}->${newHarmful}`,
+            },
+          ],
+        };
       }
     );
 
@@ -196,9 +255,9 @@ export class AceMcpAgent extends McpAgent<Env> {
         entry_id: z.string().describe("Entry ID to remove"),
       },
       async ({ entry_id }) => {
-        const result = await this.env.DB.prepare(
-          `DELETE FROM entries WHERE id = ?`
-        ).bind(entry_id).run();
+        const result = await this.env.DB.prepare("DELETE FROM entries WHERE id = ?")
+          .bind(entry_id)
+          .run();
 
         if (result.meta.changes === 0) {
           return { content: [{ type: "text", text: `Entry '${entry_id}' not found.` }] };
@@ -221,9 +280,18 @@ export class AceMcpAgent extends McpAgent<Env> {
         await this.env.DB.prepare(`
           INSERT INTO reflections (project_id, task_summary, outcome, learnings)
           VALUES (?, ?, ?, ?)
-        `).bind(project_id, task_summary, outcome, JSON.stringify(learnings)).run();
+        `)
+          .bind(project_id, task_summary, outcome, JSON.stringify(learnings))
+          .run();
 
-        return { content: [{ type: "text", text: `Logged reflection with ${learnings.length} learning(s) for: ${task_summary.slice(0, 50)}...` }] };
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Logged reflection with ${learnings.length} learning(s) for: ${task_summary.slice(0, 50)}...`,
+            },
+          ],
+        };
       }
     );
 
@@ -233,29 +301,36 @@ export class AceMcpAgent extends McpAgent<Env> {
       "Curate the playbook by removing harmful entries and finding duplicates",
       {
         project_id: z.string().optional().describe("Project to curate (default: all projects)"),
-        harmful_threshold: z.number().optional().describe("Remove entries where harmful > helpful + threshold (default: 3)"),
+        harmful_threshold: z
+          .number()
+          .optional()
+          .describe("Remove entries where harmful > helpful + threshold (default: 3)"),
       },
       async ({ project_id, harmful_threshold = 3 }) => {
         // Remove harmful entries
-        let deleteQuery = `DELETE FROM entries WHERE harmful > helpful + ?`;
+        let deleteQuery = "DELETE FROM entries WHERE harmful > helpful + ?";
         const params: (string | number)[] = [harmful_threshold];
 
         if (project_id) {
-          deleteQuery += ` AND project_id = ?`;
+          deleteQuery += " AND project_id = ?";
           params.push(project_id);
         }
 
-        const deleteResult = await this.env.DB.prepare(deleteQuery).bind(...params).run();
+        const deleteResult = await this.env.DB.prepare(deleteQuery)
+          .bind(...params)
+          .run();
         const removed = deleteResult.meta.changes || 0;
 
         // Find duplicates
-        let selectQuery = `SELECT id, content FROM entries`;
+        let selectQuery = "SELECT id, content FROM entries";
         if (project_id) {
           selectQuery += ` WHERE project_id = ? OR project_id = 'global'`;
         }
 
         const entries = project_id
-          ? await this.env.DB.prepare(selectQuery).bind(project_id).all<{ id: string; content: string }>()
+          ? await this.env.DB.prepare(selectQuery)
+              .bind(project_id)
+              .all<{ id: string; content: string }>()
           : await this.env.DB.prepare(selectQuery).all<{ id: string; content: string }>();
 
         const duplicates: string[] = [];
@@ -270,7 +345,9 @@ export class AceMcpAgent extends McpAgent<Env> {
         }
 
         const lines = [];
-        lines.push(removed > 0 ? `Removed ${removed} harmful entries.` : "No harmful entries to remove.");
+        lines.push(
+          removed > 0 ? `Removed ${removed} harmful entries.` : "No harmful entries to remove."
+        );
         if (duplicates.length > 0) {
           lines.push(`Potential duplicates: ${duplicates.slice(0, 5).join("; ")}`);
           if (duplicates.length > 5) lines.push(`  ...and ${duplicates.length - 5} more`);
@@ -297,42 +374,56 @@ export class AceMcpAgent extends McpAgent<Env> {
           SELECT id, project_id, section, content, helpful, harmful
           FROM entries
           WHERE project_id = 'global' OR project_id = ?
-        `).bind(project_id).all<{ id: string; project_id: string; section: string; content: string; helpful: number; harmful: number }>();
+        `)
+          .bind(project_id)
+          .all<{
+            id: string;
+            project_id: string;
+            section: string;
+            content: string;
+            helpful: number;
+            harmful: number;
+          }>();
 
-        const matches = (entries.results || []).filter(e =>
-          keywords.some(kw => e.content.toLowerCase().includes(kw))
+        const matches = (entries.results || []).filter((e) =>
+          keywords.some((kw) => e.content.toLowerCase().includes(kw))
         );
 
         if (matches.length === 0) {
           return { content: [{ type: "text", text: `No entries found matching '${query}'` }] };
         }
 
-        const formatted = matches.map(e => {
-          const marker = e.project_id === "global" ? "" : ` [${e.project_id}]`;
-          return `[${e.id}] helpful=${e.helpful} harmful=${e.harmful}${marker} :: ${e.content}`;
-        }).join("\n");
+        const formatted = matches
+          .map((e) => {
+            const marker = e.project_id === "global" ? "" : ` [${e.project_id}]`;
+            return `[${e.id}] helpful=${e.helpful} harmful=${e.harmful}${marker} :: ${e.content}`;
+          })
+          .join("\n");
 
-        return { content: [{ type: "text", text: `Found ${matches.length} matching entries:\n${formatted}` }] };
+        return {
+          content: [
+            { type: "text", text: `Found ${matches.length} matching entries:\n${formatted}` },
+          ],
+        };
       }
     );
 
     // Tool: list_projects
-    this.server.tool(
-      "list_projects",
-      "List all projects in the playbook system",
-      {},
-      async () => {
-        const projects = await this.env.DB.prepare(`
+    this.server.tool("list_projects", "List all projects in the playbook system", {}, async () => {
+      const projects = await this.env.DB.prepare(`
           SELECT id, description, created_at FROM projects ORDER BY created_at
         `).all<{ id: string; description: string | null; created_at: string }>();
 
-        const lines = (projects.results || []).map(p =>
-          `- ${p.id}${p.description ? `: ${p.description}` : ""}`
-        );
+      const lines = (projects.results || []).map(
+        (p) => `- ${p.id}${p.description ? `: ${p.description}` : ""}`
+      );
 
-        return { content: [{ type: "text", text: lines.length > 0 ? lines.join("\n") : "No projects found." }] };
-      }
-    );
+      return {
+        content: [
+          { type: "text", text: lines.length > 0 ? lines.join("\n") : "No projects found." },
+        ],
+      };
+    });
 
     // Tool: create_project
     this.server.tool(
@@ -346,11 +437,21 @@ export class AceMcpAgent extends McpAgent<Env> {
         try {
           await this.env.DB.prepare(`
             INSERT INTO projects (id, description) VALUES (?, ?)
-          `).bind(project_id, description || null).run();
+          `)
+            .bind(project_id, description || null)
+            .run();
 
-          return { content: [{ type: "text", text: `Created project '${project_id}'${description ? `: ${description}` : ""}` }] };
-        } catch (e: any) {
-          if (e.message?.includes("UNIQUE constraint")) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Created project '${project_id}'${description ? `: ${description}` : ""}`,
+              },
+            ],
+          };
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          if (message.includes("UNIQUE constraint")) {
             return { content: [{ type: "text", text: `Project '${project_id}' already exists.` }] };
           }
           throw e;
@@ -376,13 +477,16 @@ export default {
 
     // Health check
     if (url.pathname === "/" || url.pathname === "/health") {
-      return new Response(JSON.stringify({
-        status: "ok",
-        service: "ace-mcp",
-        version: "2.0.0"
-      }), {
-        headers: { "Content-Type": "application/json" }
-      });
+      return new Response(
+        JSON.stringify({
+          status: "ok",
+          service: "ace-mcp",
+          version: "2.0.0",
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      );
     }
 
     // MCP endpoints - route through the mount handler

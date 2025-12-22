@@ -9,9 +9,8 @@ import json
 import re
 import threading
 from datetime import datetime
-from pathlib import Path
 from difflib import SequenceMatcher
-from typing import Optional
+from pathlib import Path
 
 # Configuration
 ACE_DIR = Path.home() / ".ace"
@@ -200,7 +199,7 @@ def read_playbook(project_id: str = "global") -> str:
                 section = None
                 for s in SECTION_PREFIXES.keys():
                     _, _, section_lines = _get_section_content(global_content, s)
-                    if line.strip() in [l.strip() for l in section_lines]:
+                    if line.strip() in [section_line.strip() for section_line in section_lines]:
                         section = s
                         break
                 if section:
@@ -213,7 +212,7 @@ def read_playbook(project_id: str = "global") -> str:
                 section = None
                 for s in SECTION_PREFIXES.keys():
                     _, _, section_lines = _get_section_content(project_content, s)
-                    if line.strip() in [l.strip() for l in section_lines]:
+                    if line.strip() in [section_line.strip() for section_line in section_lines]:
                         section = s
                         break
                 if section:
@@ -361,7 +360,7 @@ def log_reflection(task_summary: str, outcome: str, learnings: list[str], projec
     return f"Logged reflection with {len(learnings)} learning(s) for task: {task_summary[:50]}..."
 
 
-def curate_playbook(project_id: Optional[str] = None, harmful_threshold: int = 3) -> str:
+def curate_playbook(project_id: str | None = None, harmful_threshold: int = 3) -> str:
     """Curate the playbook by removing harmful entries and deduplicating."""
     with _file_lock:
         # Determine which projects to curate
@@ -453,7 +452,7 @@ def list_projects() -> str:
         return "\n".join(lines) if lines else "No projects found."
 
 
-def create_project(project_id: str, description: Optional[str] = None) -> str:
+def create_project(project_id: str, description: str | None = None) -> str:
     """Create a new project for organizing domain-specific playbook entries."""
     with _file_lock:
         projects = _load_projects()

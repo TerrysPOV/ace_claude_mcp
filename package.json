@@ -9,7 +9,13 @@
     "db:create": "wrangler d1 create ace-playbook",
     "db:migrate": "wrangler d1 execute ace-playbook --file=schema.sql",
     "db:migrate:local": "wrangler d1 execute ace-playbook --local --file=schema.sql",
-    "tail": "wrangler tail"
+    "tail": "wrangler tail",
+    "lint": "npm run lint:fix",
+    "lint:py": "ruff check .",
+    "lint:ts": "biome check .",
+    "lint:fix": "npm run lint:fix:py && npm run lint:fix:ts",
+    "lint:fix:py": "ruff check . --fix",
+    "lint:fix:ts": "biome check . --fix --unsafe"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.1",
@@ -18,6 +24,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241127.0",
+    "@biomejs/biome": "^1.9.4",
     "typescript": "^5.6.0",
     "wrangler": "^4.55.0"
   }
