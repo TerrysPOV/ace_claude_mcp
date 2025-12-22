@@ -189,10 +189,15 @@ Set a global ACE contract template and a project bootstrap script:
 
 - Global template: `~/.codex/AGENTS.md`
 - Script: `~/.local/bin/codex-init`
+- Optional wrapper: `~/.local/bin/codex-ace`
 
 Usage in any project root:
 
 ```bash
+# Recommended: install the wrapper once
+cp claude-ace-mcp/bin/codex-ace ~/.local/bin/
+chmod +x ~/.local/bin/codex-ace
+
 # Uses the folder name as the project_id by default
 codex-init
 
@@ -201,7 +206,8 @@ ACE_PROJECT_ID=finance codex-init
 ```
 
 `codex-init` copies `~/.codex/AGENTS.md` into `./AGENTS.md`, substitutes
-`{project_name}` and `{project_id}`, then launches `codex` if available.
+`{project_name}` and `{project_id}`, then launches `codex-ace` (or `codex`).
+`codex-ace` ensures the ACE contract is present in `AGENTS.md` before starting.
 
 ### Connect ChatGPT (Developer Mode)
 
