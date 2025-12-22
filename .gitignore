@@ -13,5 +13,6 @@ node_modules
 .wrangler
 .DS_Store
 AGENTS.md
+AGENTS.MD
 client_secret_882263909419-kgc7s5ltjm4n10o9p2kog01rpvt04hqs.apps.googleusercontent.com.json
 migrate_user_id.sql
