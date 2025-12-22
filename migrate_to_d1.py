@@ -82,7 +82,7 @@ def escape_sql(s: str) -> str:
     return s.replace("'", "''")
 
 
-def migrate_playbook(playbook_path: Path, project_id: str) -> list[str]:
+def migrate_playbook(playbook_path: Path, project_id: str, user_id: str) -> list[str]:
     """Generate SQL INSERT statements for a playbook file."""
     if not playbook_path.exists():
         return []
@@ -99,15 +99,16 @@ def migrate_playbook(playbook_path: Path, project_id: str) -> list[str]:
                 # Use entry's project_id if present, otherwise use the file's project
                 entry_project = entry["project_id"] or project_id
                 statements.append(
-                    f"INSERT OR IGNORE INTO entries (id, project_id, section, content, helpful, harmful) "
-                    f"VALUES ('{entry['id']}', '{escape_sql(entry_project)}', '{escape_sql(section)}', "
-                    f"'{escape_sql(entry['content'])}', {entry['helpful']}, {entry['harmful']});"
+                    "INSERT OR IGNORE INTO entries "
+                    "(entry_id, project_id, user_id, section, content, helpful_count, harmful_count) "
+                    f"VALUES ('{entry['id']}', '{escape_sql(entry_project)}', '{escape_sql(user_id)}', "
+                    f"'{escape_sql(section)}', '{escape_sql(entry['content'])}', {entry['helpful']}, {entry['harmful']});"
                 )
 
     return statements
 
 
-def migrate_reflections(reflections_path: Path, project_id: str) -> list[str]:
+def migrate_reflections(reflections_path: Path, project_id: str, user_id: str) -> list[str]:
     """Generate SQL INSERT statements for a reflections file."""
     if not reflections_path.exists():
         return []
@@ -123,9 +124,9 @@ def migrate_reflections(reflections_path: Path, project_id: str) -> list[str]:
                 timestamp = reflection.get("timestamp", datetime.now().isoformat())
 
                 statements.append(
-                    f"INSERT INTO reflections (project_id, task_summary, outcome, learnings, created_at) "
-                    f"VALUES ('{escape_sql(project_id)}', '{task_summary}', '{outcome}', "
-                    f"'{learnings}', '{timestamp}');"
+                    "INSERT INTO reflections (project_id, user_id, task_summary, outcome, learnings, created_at) "
+                    f"VALUES ('{escape_sql(project_id)}', '{escape_sql(user_id)}', '{task_summary}', "
+                    f"'{outcome}', '{learnings}', '{timestamp}');"
                 )
             except json.JSONDecodeError:
                 continue
@@ -133,14 +134,14 @@ def migrate_reflections(reflections_path: Path, project_id: str) -> list[str]:
     return statements
 
 
-def migrate_projects() -> list[str]:
+def migrate_projects(user_id: str) -> list[str]:
     """Generate SQL INSERT statements for projects."""
     statements = []
 
     # Always ensure global project exists
     statements.append(
-        "INSERT OR IGNORE INTO projects (id, description) "
-        "VALUES ('global', 'Universal patterns and insights shared across all projects');"
+        "INSERT OR IGNORE INTO projects (project_id, user_id, description) "
+        f"VALUES ('global', '{escape_sql(user_id)}', 'Universal patterns and insights shared across all projects');"
     )
 
     # Load projects from file if exists
@@ -150,8 +151,8 @@ def migrate_projects() -> list[str]:
             if proj_id != "global":
                 desc = escape_sql(meta.get("description", ""))
                 statements.append(
-                    f"INSERT OR IGNORE INTO projects (id, description) "
-                    f"VALUES ('{escape_sql(proj_id)}', '{desc}');"
+                    "INSERT OR IGNORE INTO projects (project_id, user_id, description) "
+                    f"VALUES ('{escape_sql(proj_id)}', '{escape_sql(user_id)}', '{desc}');"
                 )
 
     return statements
@@ -191,7 +192,7 @@ def discover_reflections() -> dict[str, Path]:
     return reflections
 
 
-def generate_migration(project_filter: str | None = None) -> str:
+def generate_migration(project_filter: str | None = None, user_id: str = "default") -> str:
     """Generate full migration SQL."""
     lines = [
         "-- ACE Migration Script",
@@ -204,7 +205,7 @@ def generate_migration(project_filter: str | None = None) -> str:
 
     # Migrate projects
     lines.append("-- Projects")
-    lines.extend(migrate_projects())
+    lines.extend(migrate_projects(user_id))
     lines.append("")
 
     # Discover and migrate playbooks
@@ -213,7 +214,7 @@ def generate_migration(project_filter: str | None = None) -> str:
         if project_filter and project_id != project_filter:
             continue
         lines.append(f"-- Playbook entries for project: {project_id}")
-        statements = migrate_playbook(playbook_path, project_id)
+        statements = migrate_playbook(playbook_path, project_id, user_id)
         if statements:
             lines.extend(statements)
         else:
@@ -226,7 +227,7 @@ def generate_migration(project_filter: str | None = None) -> str:
         if project_filter and project_id != project_filter:
             continue
         lines.append(f"-- Reflections for project: {project_id}")
-        statements = migrate_reflections(refl_path, project_id)
+        statements = migrate_reflections(refl_path, project_id, user_id)
         if statements:
             lines.extend(statements)
         else:
@@ -285,6 +286,11 @@ def main():
         help="Migrate specific project only",
     )
     parser.add_argument(
+        "--user-id",
+        default="default",
+        help="User ID to associate with migrated data (default: default)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Show what would be migrated without doing anything",
@@ -311,7 +317,7 @@ def main():
         sys.exit(0)
 
     # Generate migration SQL
-    sql = generate_migration(args.project)
+    sql = generate_migration(args.project, args.user_id)
 
     if args.execute:
         print(f"Executing migration to database: {args.database}")

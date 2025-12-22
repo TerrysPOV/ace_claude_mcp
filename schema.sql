@@ -1,44 +1,71 @@
 -- ACE (Agentic Context Engineering) D1 Database Schema
--- Supports multi-project playbooks with global entries
+-- Supports per-user playbooks with OAuth authentication
 
-CREATE TABLE IF NOT EXISTS projects (
-    id TEXT PRIMARY KEY,
-    description TEXT,
+CREATE TABLE IF NOT EXISTS users (
+    user_id TEXT PRIMARY KEY,
+    google_sub TEXT UNIQUE,
+    email TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS projects (
+    project_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (project_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS entries (
-    id TEXT PRIMARY KEY,
-    project_id TEXT DEFAULT 'global',
+    entry_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
     section TEXT NOT NULL,
     content TEXT NOT NULL,
-    helpful INTEGER DEFAULT 0,
-    harmful INTEGER DEFAULT 0,
+    helpful_count INTEGER DEFAULT 0,
+    harmful_count INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (entry_id, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS reflections (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_id TEXT DEFAULT 'global',
+    project_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
     task_summary TEXT NOT NULL,
     outcome TEXT NOT NULL,
-    learnings TEXT NOT NULL,  -- JSON array
+    learnings TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insert global project
-INSERT OR IGNORE INTO projects (id, description) VALUES ('global', 'Universal patterns and insights shared across all projects');
+CREATE TABLE IF NOT EXISTS oauth_codes (
+    code TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    redirect_uri TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    code_challenge TEXT NOT NULL,
+    code_challenge_method TEXT NOT NULL,
+    expires_at TIMESTAMP NOT NULL
+);
 
--- Indexes for efficient queries
-CREATE INDEX IF NOT EXISTS idx_entries_project ON entries(project_id);
-CREATE INDEX IF NOT EXISTS idx_entries_section ON entries(project_id, section);
-CREATE INDEX IF NOT EXISTS idx_reflections_project ON reflections(project_id);
+CREATE TABLE IF NOT EXISTS oauth_clients (
+    client_id TEXT PRIMARY KEY,
+    client_secret_hash TEXT NOT NULL,
+    redirect_uris TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
--- Default global entries
-INSERT OR IGNORE INTO entries (id, project_id, section, content, helpful, harmful) VALUES
-    ('str-00001', 'global', 'STRATEGIES & INSIGHTS', 'Break complex problems into smaller, manageable steps.', 0, 0),
-    ('str-00002', 'global', 'STRATEGIES & INSIGHTS', 'Validate assumptions before proceeding with solutions.', 0, 0),
-    ('cal-00001', 'global', 'FORMULAS & CALCULATIONS', 'ROI = (Gain - Cost) / Cost * 100', 0, 0),
-    ('mis-00001', 'global', 'COMMON MISTAKES TO AVOID', 'Don''t assume input data is clean - always validate.', 0, 0),
-    ('dom-00001', 'global', 'DOMAIN KNOWLEDGE', 'Context window limits require prioritizing relevant information.', 0, 0);
+CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    client_id TEXT NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_entries_user_project ON entries(user_id, project_id);
+CREATE INDEX IF NOT EXISTS idx_entries_user_section ON entries(user_id, project_id, section);
+CREATE INDEX IF NOT EXISTS idx_reflections_user ON reflections(user_id, project_id);
+CREATE INDEX IF NOT EXISTS idx_oauth_codes_user ON oauth_codes(user_id);
+CREATE INDEX IF NOT EXISTS idx_oauth_refresh_user ON oauth_refresh_tokens(user_id);

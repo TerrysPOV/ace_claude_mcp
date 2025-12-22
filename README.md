@@ -1,8 +1,19 @@
 # ACE Claude MCP
 
-**Agentic Context Engineering (ACE)** - A self-improving knowledge system for Claude Code that learns from every session.
+**Agentic Context Engineering (ACE)** - A self-improving knowledge system for AI coding assistants that learns from every session.
 
-ACE provides persistent, cross-project learning via an MCP server. Claude automatically reads accumulated wisdom at session start and logs new insights during work.
+ACE provides persistent, cross-project learning via an MCP server. Claude/ChatGPT automatically reads accumulated wisdom at session start and logs new insights during work.
+
+## Multi-Client Support
+
+ACE supports **multiple AI clients** through dual transport endpoints:
+
+| Endpoint | Transport | Clients |
+|----------|-----------|---------|
+| `/sse` | SSE (legacy) | Claude Code, Claude Desktop |
+| `/mcp` | Streamable HTTP | ChatGPT, OpenAI Codex CLI |
+
+**Production URL:** `https://ace-mcp.terry-yodaiken.workers.dev`
 
 ## Architecture
 
@@ -122,12 +133,33 @@ wrangler d1 execute ace-playbook --remote --file=schema.sql
 npm run deploy
 ```
 
+### OAuth Setup (Google + ChatGPT)
+
+Set secrets before deploying:
+
+```bash
+wrangler secret put GOOGLE_CLIENT_ID
+wrangler secret put GOOGLE_CLIENT_SECRET
+wrangler secret put GOOGLE_REDIRECT_URI
+wrangler secret put OAUTH_CLIENT_ID
+wrangler secret put OAUTH_CLIENT_SECRET
+wrangler secret put OAUTH_REDIRECT_URIS
+wrangler secret put JWT_SECRET
+
+# Optional
+wrangler secret put REQUIRE_AUTH
+wrangler secret put DEFAULT_USER_ID
+```
+
 ### Endpoints
 
 | Endpoint | Description |
 |----------|-------------|
 | `GET /health` | Health check |
 | `GET /sse` | SSE endpoint for MCP |
+| `GET /oauth/authorize` | OAuth authorization endpoint |
+| `GET /oauth/callback` | OAuth callback endpoint |
+| `POST /oauth/token` | OAuth token exchange endpoint |
 
 **Production URL:** `https://ace-mcp.terry-yodaiken.workers.dev`
 
@@ -138,6 +170,29 @@ Without the wrapper, you can add the MCP server directly:
 ```bash
 claude mcp add --transport sse ace https://ace-mcp.terry-yodaiken.workers.dev/sse
 ```
+
+### Connect OpenAI Codex CLI
+
+Add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.ace]
+url = "https://ace-mcp.terry-yodaiken.workers.dev/mcp"
+
+[features]
+rmcp_client = true
+```
+
+### Connect ChatGPT (Developer Mode)
+
+1. Enable: Settings → Connectors → Advanced → Developer Mode
+2. Create: Settings → Connectors → Create
+3. URL: `https://ace-mcp.terry-yodaiken.workers.dev/mcp`
+4. Name: "ACE Playbook"
+5. OAuth settings:
+   - Authorization URL: `https://ace-mcp.terry-yodaiken.workers.dev/oauth/authorize`
+   - Token URL: `https://ace-mcp.terry-yodaiken.workers.dev/oauth/token`
+   - Client ID/Secret: use the values configured in Worker secrets
 
 ## Local Python Server (Alternative)
 
@@ -162,6 +217,15 @@ Storage location: `~/.ace/playbooks/`
 | Variable | Description |
 |----------|-------------|
 | `ANTHROPIC_API_KEY` | Required for Claude Code |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `GOOGLE_REDIRECT_URI` | Google OAuth redirect URI (points to `/oauth/callback`) |
+| `OAUTH_CLIENT_ID` | OAuth client ID for ChatGPT connector |
+| `OAUTH_CLIENT_SECRET` | OAuth client secret for ChatGPT connector |
+| `OAUTH_REDIRECT_URIS` | Comma-separated allowed redirect URIs |
+| `JWT_SECRET` | HMAC secret for access tokens/state |
+| `REQUIRE_AUTH` | `true` to require OAuth for `/mcp` and `/sse` |
+| `DEFAULT_USER_ID` | Fallback user ID for legacy clients without OAuth |
 
 ### Files
 
