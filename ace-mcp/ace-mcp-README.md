@@ -1,6 +1,6 @@
-# claude-ace (MCP Version)
+# ace-mcp (Claude Code Wrapper)
 
-**Enforced ACE framework for Claude Code** using the `ace_claude_mcp` Cloudflare Worker.
+**Enforced ACE framework for Claude Code** using the `ace-mcp` Cloudflare Worker.
 
 ## How It Works
 
@@ -55,7 +55,7 @@ This is **enforcement**, not suggestion. Claude is contractually obligated.
 ## Installation
 
 ```bash
-cd claude-ace-mcp
+cd ace-mcp
 chmod +x install.sh
 ./install.sh
 

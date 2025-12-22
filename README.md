@@ -1,4 +1,4 @@
-# ACE Claude MCP
+# ACE MCP
 
 **Agentic Context Engineering (ACE)** - A self-improving knowledge system for AI coding assistants that learns from every session.
 
@@ -29,7 +29,7 @@ Two deployment options:
 ### 1. Install the Wrapper
 
 ```bash
-cd claude-ace-mcp
+cd ace-mcp
 ./install.sh
 ```
 
@@ -37,7 +37,7 @@ Or manually:
 
 ```bash
 mkdir -p ~/.ace/bin
-cp claude-ace-mcp/bin/claude-ace ~/.ace/bin/
+cp ace-mcp/bin/claude-ace ~/.ace/bin/
 chmod +x ~/.ace/bin/claude-ace
 
 # Add to PATH
@@ -195,7 +195,7 @@ Usage in any project root:
 
 ```bash
 # Recommended: install the wrapper once
-cp claude-ace-mcp/bin/codex-ace ~/.local/bin/
+cp ace-mcp/bin/codex-ace ~/.local/bin/
 chmod +x ~/.local/bin/codex-ace
 
 # Uses the folder name as the project_id by default
