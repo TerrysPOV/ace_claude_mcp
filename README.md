@@ -183,6 +183,26 @@ url = "https://ace-mcp.terry-yodaiken.workers.dev/mcp"
 rmcp_client = true
 ```
 
+### Global AGENTS Template + codex-init
+
+Set a global ACE contract template and a project bootstrap script:
+
+- Global template: `~/.codex/AGENTS.md`
+- Script: `~/.local/bin/codex-init`
+
+Usage in any project root:
+
+```bash
+# Uses the folder name as the project_id by default
+codex-init
+
+# Override the project_id
+ACE_PROJECT_ID=finance codex-init
+```
+
+`codex-init` copies `~/.codex/AGENTS.md` into `./AGENTS.md`, substitutes
+`{project_name}` and `{project_id}`, then launches `codex` if available.
+
 ### Connect ChatGPT (Developer Mode)
 
 1. Enable: Settings → Connectors → Advanced → Developer Mode
