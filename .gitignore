@@ -12,5 +12,6 @@ node_modules
 .venv
 .wrangler
 .DS_Store
+AGENTS.md
 client_secret_882263909419-kgc7s5ltjm4n10o9p2kog01rpvt04hqs.apps.googleusercontent.com.json
 migrate_user_id.sql
