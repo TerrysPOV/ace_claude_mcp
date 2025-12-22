@@ -35,6 +35,13 @@ url = "https://ace-mcp.terry-yodaiken.workers.dev/mcp"
 rmcp_client = true
 ```
 
+If Codex CLI cannot complete Google OAuth, use a static bearer token:
+
+```toml
+[mcp_servers.ace]
+url = "https://ace-mcp.terry-yodaiken.workers.dev/mcp?access_token=YOUR_MCP_BEARER_TOKEN"
+```
+
 Then use Codex normally:
 
 ```bash

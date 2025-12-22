@@ -145,6 +145,11 @@ wrangler secret put OAUTH_CLIENT_ID
 wrangler secret put OAUTH_CLIENT_SECRET
 wrangler secret put OAUTH_REDIRECT_URIS
 wrangler secret put JWT_SECRET
+wrangler secret put MCP_BEARER_TOKEN
+
+# Optional: identity fields for static bearer auth
+wrangler secret put MCP_BEARER_USER_ID
+wrangler secret put MCP_BEARER_EMAIL
 
 # Optional
 wrangler secret put REQUIRE_AUTH
@@ -182,6 +187,15 @@ url = "https://ace-mcp.terry-yodaiken.workers.dev/mcp"
 [features]
 rmcp_client = true
 ```
+
+If Codex CLI cannot complete Google OAuth, use the static bearer token:
+
+```toml
+[mcp_servers.ace]
+url = "https://ace-mcp.terry-yodaiken.workers.dev/mcp?access_token=YOUR_MCP_BEARER_TOKEN"
+```
+
+Security note: the `access_token` in the URL is treated like a password. Store it in local config only, rotate it if exposed, and avoid sharing logs or screenshots that include the full URL.
 
 ### Global AGENTS Template + codex-init
 

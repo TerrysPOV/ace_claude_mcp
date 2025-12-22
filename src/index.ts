@@ -20,6 +20,9 @@ interface Env {
   MCP_AGENT: DurableObjectNamespace<AceMcpAgent>;
   DEFAULT_USER_ID?: string;
   REQUIRE_AUTH?: string;
+  MCP_BEARER_TOKEN?: string;
+  MCP_BEARER_USER_ID?: string;
+  MCP_BEARER_EMAIL?: string;
   OAUTH_CLIENT_ID?: string;
   OAUTH_CLIENT_SECRET?: string;
   OAUTH_REDIRECT_URIS?: string;
@@ -621,14 +624,30 @@ function jsonRpcError(status: number, message: string): Response {
   );
 }
 
-async function getAuthInfo(request: Request, env: Env): Promise<AuthInfo | null> {
+function extractBearerToken(request: Request): string | null {
   const authHeader =
     request.headers.get("authorization") || request.headers.get("Authorization") || "";
-  if (!authHeader.startsWith("Bearer ")) {
+  if (authHeader.startsWith("Bearer ")) {
+    const token = authHeader.slice("Bearer ".length).trim();
+    return token.length > 0 ? token : null;
+  }
+  const url = new URL(request.url);
+  const queryToken = url.searchParams.get("access_token") || url.searchParams.get("token");
+  return queryToken?.trim() || null;
+}
+
+async function getAuthInfo(request: Request, env: Env): Promise<AuthInfo | null> {
+  const token = extractBearerToken(request);
+  if (!token) {
     return null;
   }
-  const token = authHeader.slice("Bearer ".length).trim();
-  if (!token || !env.JWT_SECRET) {
+  if (env.MCP_BEARER_TOKEN && timingSafeEqual(token, env.MCP_BEARER_TOKEN)) {
+    return {
+      userId: env.MCP_BEARER_USER_ID || env.DEFAULT_USER_ID || "mcp-bearer",
+      email: env.MCP_BEARER_EMAIL,
+    };
+  }
+  if (!env.JWT_SECRET) {
     return null;
   }
   const payload = await verifyJwt(token, env.JWT_SECRET);
